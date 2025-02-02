@@ -2,11 +2,13 @@ package main
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
+	"OpnLaaS.cyber.unh.edu/database"
 	"OpnLaaS.cyber.unh.edu/lib"
 )
 
@@ -84,10 +86,21 @@ func main() {
 		lib.Log.Status("Successfully initialized environment")
 	}
 
-	// Basic http server
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	if !database.Connect() {
+		return
+	}
+
+	metadataJSON, _ := json.Marshal(map[string]interface{}{
+		"name":                 lib.Config.LabName,
+		"organization":         lib.Config.LabOrg,
+		"contact":              lib.Config.LabContact,
+		"emailDomainWhiteList": lib.Config.EmailDomainWhiteList,
+	})
+
+	http.HandleFunc("/metadata.json", func(w http.ResponseWriter, r *http.Request) {
 		withCors(w, r)
-		http.ServeFile(w, r, "index.html")
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(metadataJSON)
 	})
 
 	lib.Log.Status(fmt.Sprintf("Server started on port %d", lib.Config.Port))

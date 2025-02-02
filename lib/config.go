@@ -12,12 +12,9 @@ type Environment struct {
 	TlsDir string `env:"TLS_DIR"`
 
 	// Database setup
-	DbHost     string `env:"DB_HOST,default=localhost"`
-	DbPort     int    `env:"DB_PORT,default=5432"`
-	DbUser     string `env:"DB_USER,default=postgres"`
-	DbPassword string `env:"DB_PASSWORD,default=postgres"`
-	DbName     string `env:"DB_NAME,default=postgres"`
-	DbSalt     string `env:"DB_SALT,required=true"`
+	DBFile      string `env:"DB_FILE,default=opnlaas.db"`
+	DBSalt      string `env:"DB_SALT,required=true"`
+	DBQueueSize int    `env:"DB_QUEUE_SIZE,default=256"`
 
 	// SMTP Email setup
 	SmtpHost     string `env:"SMTP_HOST,required=true"`

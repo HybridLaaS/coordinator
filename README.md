@@ -12,7 +12,9 @@ HOST=127.0.0.1
 PORT=8090
 
 # Database setup
-DB_SALT=GoofyRandomString
+DB_FILE=sqlite.db
+DB_SALT=RandomGoofyString
+DB_QUEUE_SIZE=256
 
 # SMTP Email setup
 SMTP_HOST=smtp.gmail.com
