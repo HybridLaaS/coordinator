@@ -2,7 +2,9 @@ package lib
 
 import "regexp"
 
-var emailRegex *regexp.Regexp = regexp.MustCompile(`^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,4}$`)
+// Leaving the + in the first thing opens up to the possibility of mail bombing
+// sample+1@gmail.com and sample+2@gmail.com point to the same mailbox, but are different emails
+var emailRegex *regexp.Regexp = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-z]{2,4}$`)
 var nameRegex *regexp.Regexp = regexp.MustCompile(`^[a-zA-Z0-9_ ']+$`)
 
 func IsEmailValid(email string) bool {

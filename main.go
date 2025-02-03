@@ -103,6 +103,230 @@ func main() {
 		w.Write(metadataJSON)
 	})
 
+	// Create
+	http.HandleFunc("/api/user/create", func(w http.ResponseWriter, r *http.Request) {
+		withCors(w, r)
+
+		if r.Method != "POST" {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "text/plain" {
+			w.WriteHeader(http.StatusUnsupportedMediaType)
+			return
+		}
+
+		body := make([]byte, r.ContentLength)
+		r.Body.Read(body)
+
+		obj := struct {
+			Email    string `json:"email"`
+			First    string `json:"firstName"`
+			Last     string `json:"lastName"`
+			Password string `json:"password"`
+		}{}
+
+		err := json.Unmarshal(body, &obj)
+
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		user, statusCode := database.CreateUser(strings.ToLower(obj.Email), obj.First, obj.Last, database.HashPassword(obj.Password))
+
+		if statusCode != nil {
+			switch statusCode {
+			case database.ErrUserExists:
+				w.WriteHeader(http.StatusIMUsed)
+			case database.ErrBadData:
+				w.WriteHeader(http.StatusBadRequest)
+			default:
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+
+			return
+		}
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "email",
+			Value:    strings.ToLower(obj.Email),
+			Path:     "/",
+			SameSite: http.SameSiteNoneMode,
+			Secure:   true,
+		})
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "token",
+			Value:    TokenFor(strings.ToLower(obj.Email)),
+			Path:     "/",
+			SameSite: http.SameSiteNoneMode,
+			Secure:   true,
+		})
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(user.JSON())
+
+		lib.Log.Basic(fmt.Sprintf("User %s created", obj.Email))
+	})
+
+	// Login
+	http.HandleFunc("/api/user/login", func(w http.ResponseWriter, r *http.Request) {
+		withCors(w, r)
+		if r.Method != "POST" {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "text/plain" {
+			w.WriteHeader(http.StatusUnsupportedMediaType)
+			return
+		}
+
+		body := make([]byte, r.ContentLength)
+		r.Body.Read(body)
+
+		obj := struct {
+			Email    string `json:"email"`
+			Password string `json:"password"`
+		}{}
+
+		err := json.Unmarshal(body, &obj)
+
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		user, err := database.GetUser(strings.ToLower(obj.Email))
+
+		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		if user == nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		if user.PasswordHash != database.HashPassword(obj.Password) {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "email",
+			Value:    strings.ToLower(obj.Email),
+			Path:     "/",
+			SameSite: http.SameSiteNoneMode,
+			Secure:   true,
+		})
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "token",
+			Value:    TokenFor(strings.ToLower(obj.Email)),
+			Path:     "/",
+			SameSite: http.SameSiteNoneMode,
+			Secure:   true,
+		})
+
+		w.WriteHeader(http.StatusOK)
+
+		lib.Log.Basic(fmt.Sprintf("User %s logged in", obj.Email))
+	})
+
+	// Me
+	http.HandleFunc("/api/user/me", func(w http.ResponseWriter, r *http.Request) {
+		withCors(w, r)
+		if !withAuth(w, r) {
+			return
+		}
+
+		email, _ := r.Cookie("email")
+		user, err := database.GetUser(email.Value)
+
+		if err != nil {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(user.JSON())
+	})
+
+	// Logout
+	http.HandleFunc("/api/user/logout", func(w http.ResponseWriter, r *http.Request) {
+		withCors(w, r)
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "email",
+			Value:    "",
+			Path:     "/",
+			SameSite: http.SameSiteNoneMode,
+			Secure:   true,
+		})
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "token",
+			Value:    "",
+			Path:     "/",
+			SameSite: http.SameSiteNoneMode,
+			Secure:   true,
+		})
+
+		w.WriteHeader(http.StatusOK)
+
+		if email, err := r.Cookie("email"); err == nil {
+			lib.Log.Basic(fmt.Sprintf("User %s logged out", email.Value))
+		} else {
+			lib.Log.Basic("Unknown user logged out")
+		}
+	})
+
+	// Delete user (self only)
+	http.HandleFunc("/api/user/delete", func(w http.ResponseWriter, r *http.Request) {
+		withCors(w, r)
+
+		if !withAuth(w, r) {
+			return
+		}
+
+		if r.Method != "DELETE" {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		email, _ := r.Cookie("email")
+		err := database.DeleteUser(email.Value)
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "email",
+			Value:    "",
+			Path:     "/",
+			SameSite: http.SameSiteNoneMode,
+			Secure:   true,
+		})
+
+		http.SetCookie(w, &http.Cookie{
+			Name:     "token",
+			Value:    "",
+			Path:     "/",
+			SameSite: http.SameSiteNoneMode,
+			Secure:   true,
+		})
+
+		w.WriteHeader(http.StatusOK)
+
+		lib.Log.Basic(fmt.Sprintf("User %s deleted", email.Value))
+	})
+
 	lib.Log.Status(fmt.Sprintf("Server started on port %d", lib.Config.Port))
 	var at string = fmt.Sprintf("%s:%d", lib.Config.Host, lib.Config.Port)
 

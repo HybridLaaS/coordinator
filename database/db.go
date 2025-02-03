@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"errors"
 	"time"
 
 	"OpnLaaS.cyber.unh.edu/lib"
@@ -12,6 +13,8 @@ const (
 	maxRetries = 5
 	baseDelay  = 100 * time.Millisecond
 )
+
+var ErrBadData = errors.New("bad data")
 
 var db *sql.DB
 
