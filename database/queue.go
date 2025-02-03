@@ -78,7 +78,14 @@ func (q *DBQueue) Shutdown() {
 
 func QueuedExec(query string, args ...interface{}) error {
 	return GetQueue().EnqueueOperation(func() error {
-		_, err := db.Exec(query, args...)
+		stmt, err := db.Prepare(query)
+		if err != nil {
+			return err
+		}
+
+		defer stmt.Close()
+		_, err = stmt.Exec(args...)
+
 		return err
 	})
 }
@@ -86,19 +93,34 @@ func QueuedExec(query string, args ...interface{}) error {
 func QueuedQuery(query string, args ...interface{}) (*sql.Rows, error) {
 	var rows *sql.Rows
 	err := GetQueue().EnqueueOperation(func() error {
-		var err error
-		rows, err = db.Query(query, args...)
+		stmt, err := db.Prepare(query)
+		if err != nil {
+			return err
+		}
+
+		defer stmt.Close()
+		rows, err = stmt.Query(args...)
+
 		return err
 	})
+
 	return rows, err
 }
 
 func QueuedQueryRow(query string, args ...interface{}) *sql.Row {
 	var row *sql.Row
 	_ = GetQueue().EnqueueOperation(func() error {
-		row = db.QueryRow(query, args...)
+		stmt, err := db.Prepare(query)
+		if err != nil {
+			return err
+		}
+
+		defer stmt.Close()
+		row = stmt.QueryRow(args...)
+
 		return nil
 	})
+
 	return row
 }
 
