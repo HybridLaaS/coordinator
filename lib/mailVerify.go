@@ -12,12 +12,12 @@ func SendEmailTo(to, key string) {
 	emailBody := "Please use the following code to log in: <code>" + key + "</code>"
 
 	m := mail.NewMessage()
-	m.SetHeader("From", "w1hlo.hamchat@gmail.com")
+	m.SetHeader("From", Config.SmtpUser)
 	m.SetHeader("To", to)
 	m.SetHeader("Subject", "Login Code")
 	m.SetBody("text/html", emailBody)
 
-	d := mail.NewDialer("smtp.gmail.com", 587, "w1hlo.hamchat@gmail.com", "ckkm gaws caoe ries")
+	d := mail.NewDialer(Config.SmtpHost, Config.SmtpPort, Config.SmtpUser, Config.SmtpPassword)
 
 	if err := d.DialAndSend(m); err != nil {
 		log.Fatalf("Could not send email: %v", err)
