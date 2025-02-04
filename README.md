@@ -30,3 +30,17 @@ EMAIL_DOMAIN_WHITELIST=gmail.com,university.edu
 ```
 
 If this is configured wrong, an error will be thrown and the server will not start.
+
+## Host Management
+
+Hosts can be added and managed from the admin panel. To add a host, it must meet the following requirements:
+
+1. Host must have a BMC with an IPMI web interface bound to a static IPv4 address
+2. Host must have support for modern Redfish API standards
+3. Host must have a logon for the IPMI and Redfish that grants administrative permissions
+
+When you create a host, it will reach out via the Redfish API to query the health and specs of the host. The spec queries will be checked daily, and the health will be queried hourly. These durations can be configured in the env file.
+
+If host issues persist, the SMTP client will email admin users about the issues. Emails will only be sent out about new issues.
+
+> Please snsure that your BMC is running the latest firmware. If you are using a dell machine, please update your iDRAC using https://dell.com/support.

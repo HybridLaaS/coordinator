@@ -1,8 +1,6 @@
 package lib
 
 import (
-	"fmt"
-	"log"
 	"math/rand"
 	"time"
 
@@ -18,12 +16,10 @@ func SendEmailTo(to, key string) {
 	m.SetHeader("Subject", "Login Code")
 	m.SetBody("text/html", emailBody)
 
-	fmt.Println(Config.SmtpHost, Config.SmtpPort, Config.SmtpUser, Config.SmtpPassword)
-
 	d := mail.NewDialer(Config.SmtpHost, Config.SmtpPort, Config.SmtpUser, Config.SmtpPassword)
 
 	if err := d.DialAndSend(m); err != nil {
-		log.Fatalf("Could not send email: %v", err)
+		Log.Error("Failed to send email to " + to + ": " + err.Error())
 	}
 }
 
