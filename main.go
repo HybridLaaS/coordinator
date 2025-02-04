@@ -120,11 +120,41 @@ func main() {
 		body := make([]byte, r.ContentLength)
 		r.Body.Read(body)
 
+		var obj lib.PendingAccount
+		err := json.Unmarshal(body, &obj)
+
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+
+		lib.InitializeAccountCreation(obj)
+
+		w.WriteHeader(http.StatusOK)
+
+		lib.Log.Status(fmt.Sprintf("User %s requested creation", obj.Email))
+	})
+
+	// Verify email
+	http.HandleFunc("/api/user/verify", func(w http.ResponseWriter, r *http.Request) {
+		withCors(w, r)
+
+		if r.Method != "POST" {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "text/plain" {
+			w.WriteHeader(http.StatusUnsupportedMediaType)
+			return
+		}
+
+		body := make([]byte, r.ContentLength)
+		r.Body.Read(body)
+
 		obj := struct {
-			Email    string `json:"email"`
-			First    string `json:"firstName"`
-			Last     string `json:"lastName"`
-			Password string `json:"password"`
+			Email string `json:"email"`
+			Token string `json:"token"`
 		}{}
 
 		err := json.Unmarshal(body, &obj)
@@ -134,41 +164,45 @@ func main() {
 			return
 		}
 
-		user, statusCode := database.CreateUser(strings.ToLower(obj.Email), obj.First, obj.Last, database.HashPassword(obj.Password))
+		if acc := lib.CompleteAccountCreation(obj.Email, obj.Token); acc != nil {
+			user, statusCode := database.CreateUser(strings.ToLower(acc.Email), acc.FirstName, acc.LastName, database.HashPassword(acc.Password))
 
-		if statusCode != nil {
-			switch statusCode {
-			case database.ErrUserExists:
-				w.WriteHeader(http.StatusIMUsed)
-			case database.ErrBadData:
-				w.WriteHeader(http.StatusBadRequest)
-			default:
-				w.WriteHeader(http.StatusInternalServerError)
+			if statusCode != nil {
+				switch statusCode {
+				case database.ErrUserExists:
+					w.WriteHeader(http.StatusIMUsed)
+				case database.ErrBadData:
+					w.WriteHeader(http.StatusBadRequest)
+				default:
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+
+				return
 			}
 
-			return
+			http.SetCookie(w, &http.Cookie{
+				Name:     "email",
+				Value:    strings.ToLower(obj.Email),
+				Path:     "/",
+				SameSite: http.SameSiteNoneMode,
+				Secure:   true,
+			})
+
+			http.SetCookie(w, &http.Cookie{
+				Name:     "token",
+				Value:    TokenFor(strings.ToLower(obj.Email)),
+				Path:     "/",
+				SameSite: http.SameSiteNoneMode,
+				Secure:   true,
+			})
+
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(user.JSON())
+
+			lib.Log.Basic(fmt.Sprintf("User %s created", obj.Email))
+		} else {
+			w.WriteHeader(http.StatusUnauthorized)
 		}
-
-		http.SetCookie(w, &http.Cookie{
-			Name:     "email",
-			Value:    strings.ToLower(obj.Email),
-			Path:     "/",
-			SameSite: http.SameSiteNoneMode,
-			Secure:   true,
-		})
-
-		http.SetCookie(w, &http.Cookie{
-			Name:     "token",
-			Value:    TokenFor(strings.ToLower(obj.Email)),
-			Path:     "/",
-			SameSite: http.SameSiteNoneMode,
-			Secure:   true,
-		})
-
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(user.JSON())
-
-		lib.Log.Basic(fmt.Sprintf("User %s created", obj.Email))
 	})
 
 	// Login

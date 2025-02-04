@@ -18,7 +18,3 @@ func IsPasswordValid(password string) bool {
 func IsNameValid(name string) bool {
 	return len(name) > 0 && len(name) <= 48 && nameRegex.MatchString(name)
 }
-
-func CleanFromSQLInjection(s string) string {
-	return s
-}

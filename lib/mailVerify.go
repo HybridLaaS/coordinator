@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"fmt"
 	"log"
 	"math/rand"
 	"time"
@@ -16,6 +17,8 @@ func SendEmailTo(to, key string) {
 	m.SetHeader("To", to)
 	m.SetHeader("Subject", "Login Code")
 	m.SetBody("text/html", emailBody)
+
+	fmt.Println(Config.SmtpHost, Config.SmtpPort, Config.SmtpUser, Config.SmtpPassword)
 
 	d := mail.NewDialer(Config.SmtpHost, Config.SmtpPort, Config.SmtpUser, Config.SmtpPassword)
 
@@ -55,11 +58,51 @@ func VerifyEmail(email string) *EmailToken {
 	var token *EmailToken = new(EmailToken)
 	token.Email = email
 	token.Token = token.Generate()
-	token.Expires = time.Now().Add(time.Minute * 3)
+	token.Expires = time.Now().Add(time.Minute * 10)
 
 	emailTokens[email] = token
 
 	SendEmailTo(email, token.Token)
 
 	return token
+}
+
+type PendingAccount struct {
+	Email     string `json:"email"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+	Password  string `json:"password"`
+
+	emailToken      EmailToken
+	deletionTimeout *time.Timer
+}
+
+var pendingAccounts map[string]PendingAccount = make(map[string]PendingAccount)
+
+func InitializeAccountCreation(acc PendingAccount) {
+	if _, ok := pendingAccounts[acc.Email]; ok {
+		pendingAccounts[acc.Email].deletionTimeout.Stop()
+		delete(pendingAccounts, acc.Email)
+	}
+
+	acc.emailToken = *VerifyEmail(acc.Email)
+	acc.deletionTimeout = time.NewTimer(time.Minute * 10)
+	pendingAccounts[acc.Email] = acc
+
+	go func() {
+		<-acc.deletionTimeout.C
+		delete(pendingAccounts, acc.Email)
+	}()
+}
+
+func CompleteAccountCreation(email, token string) *PendingAccount {
+	if acc, ok := pendingAccounts[email]; ok {
+		if acc.emailToken.Token == token && !acc.emailToken.Expired() {
+			delete(pendingAccounts, email)
+			acc.deletionTimeout.Stop()
+			return &acc
+		}
+	}
+
+	return nil
 }
