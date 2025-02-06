@@ -143,4 +143,10 @@ func UpdateHostIPMI(name, address, username, password string, redfishVersion int
 	return QueuedExec(UPDATE_HOST_IPMI_STATEMENT, address, username, password, redfishVersion, name)
 }
 
-func (h *DBHost) T() {}
+func (h *DBHost) PollHealth() {
+
+}
+
+func (h *DBHost) PollHardware() {
+
+}
